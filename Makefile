@@ -1,9 +1,11 @@
-.PHONY: help db-up db-down db-logs run test fmt clippy check lint
+.PHONY: help db-up db-down db-logs run test bench fmt clippy check lint
 
 COMPOSE ?= docker compose -f compose.yaml
 
-# Helper to load .env and export variables
-load-env = $(if $(wildcard .env),$(eval include .env)$(eval export))
+# Helper to load .env and export variables for shell commands
+WITH_ENV = @set -a; \
+	if [ -f .env ]; then . ./.env; fi; \
+	set +a;
 
 help:
 	@echo "Common commands:"
@@ -12,6 +14,7 @@ help:
 	@echo "  make db-logs   # Follow PostgreSQL logs"
 	@echo "  make run       # Run the API"
 	@echo "  make test      # Run tests"
+	@echo "  make bench     # Run benchmarks"
 	@echo "  make fmt       # Format code"
 	@echo "  make clippy    # Run clippy (warnings as errors)"
 	@echo "  make check     # Cargo check"
@@ -27,16 +30,13 @@ db-logs:
 	$(COMPOSE) logs -f db
 
 run:
-	@set -a; \
-	if [ -f .env ]; then . ./.env; fi; \
-	set +a; \
-	cargo run
+	$(WITH_ENV) cargo run
 
 test:
-	@set -a; \
-	if [ -f .env ]; then . ./.env; fi; \
-	set +a; \
-	cargo test
+	$(WITH_ENV) cargo test
+
+bench:
+	$(WITH_ENV) cargo bench
 
 fmt:
 	cargo fmt

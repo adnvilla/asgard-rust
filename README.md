@@ -57,4 +57,28 @@ Con PostgreSQL levantado y `DATABASE_URL` configurada:
 cargo test
 ```
 
+### Benchmarks
+
+Para medir el rendimiento de la API, ejecuta los benchmarks con:
+
+```bash
+cargo bench
+```
+
+Los benchmarks evalúan la capacidad y rendimiento de los siguientes endpoints:
+
+- `GET /health` - Health check (sin base de datos)
+- `GET /users`, `/products`, `/orders` - Listado de recursos
+- `GET /users/:id` - Obtener recurso por ID
+- `POST /users`, `/products`, `/orders` - Crear recursos
+- `PUT /users/:id` - Actualizar recurso
+- `DELETE /orders/:id` - Eliminar recurso
+
+**Requisitos:**
+- PostgreSQL debe estar levantado
+- `DATABASE_URL` debe estar configurada
+- Los benchmarks crearán datos de prueba temporalmente
+
+Los resultados se guardan en `target/criterion/` con reportes HTML detallados.
+
 

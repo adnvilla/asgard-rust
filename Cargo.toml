@@ -32,5 +32,11 @@ indexmap = "=2.2.6"
 [dev-dependencies]
 tower = "0.4"
 hyper = "0.14"
+criterion = { version = "0.5", features = ["async_tokio", "html_reports"] }
+tokio-test = "0.4"
+
+[[bench]]
+name = "api_bench"
+harness = false
 
 
