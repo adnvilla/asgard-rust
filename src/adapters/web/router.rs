@@ -49,12 +49,10 @@ async fn health(State(state): State<AppState>) -> Result<Json<HealthResponse>, A
 }
 
 async fn db_health(pool: PgPool) -> bool {
-  let fut = sqlx::query_scalar::<_, i64>("SELECT 1").fetch_one(&pool);
-  tokio::time::timeout(Duration::from_secs(2), fut)
-    .await
-    .ok()
-    .and_then(|r| r.ok())
-    .is_some()
+  matches!(
+    tokio::time::timeout(Duration::from_secs(2), sqlx::query("SELECT 1").execute(&pool)).await,
+    Ok(Ok(_))
+  )
 }
 
 // ===== Users =====
