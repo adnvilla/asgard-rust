@@ -68,16 +68,18 @@ impl UserRepository for PgUserRepository {
     .await
     .map_err(map_sqlx_err)?;
 
-    Ok(rows
-      .into_iter()
-      .map(|row| User {
-        id: row.get::<Uuid, _>("id"),
-        email: row.get::<String, _>("email"),
-        name: row.get::<String, _>("name"),
-        created_at: row.get::<DateTime<Utc>, _>("created_at"),
-        updated_at: row.get::<DateTime<Utc>, _>("updated_at"),
-      })
-      .collect())
+    Ok(
+      rows
+        .into_iter()
+        .map(|row| User {
+          id: row.get::<Uuid, _>("id"),
+          email: row.get::<String, _>("email"),
+          name: row.get::<String, _>("name"),
+          created_at: row.get::<DateTime<Utc>, _>("created_at"),
+          updated_at: row.get::<DateTime<Utc>, _>("updated_at"),
+        })
+        .collect(),
+    )
   }
 
   async fn get(&self, id: Uuid) -> Result<User, RepoError> {
@@ -142,5 +144,3 @@ impl UserRepository for PgUserRepository {
     Ok(())
   }
 }
-
-

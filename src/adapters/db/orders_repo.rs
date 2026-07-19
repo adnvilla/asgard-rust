@@ -70,17 +70,19 @@ impl OrderRepository for PgOrderRepository {
     .await
     .map_err(map_sqlx_err)?;
 
-    Ok(rows
-      .into_iter()
-      .map(|row| Order {
-        id: row.get::<Uuid, _>("id"),
-        user_id: row.get::<Uuid, _>("user_id"),
-        status: row.get::<String, _>("status"),
-        total_cents: row.get::<i64, _>("total_cents"),
-        created_at: row.get::<DateTime<Utc>, _>("created_at"),
-        updated_at: row.get::<DateTime<Utc>, _>("updated_at"),
-      })
-      .collect())
+    Ok(
+      rows
+        .into_iter()
+        .map(|row| Order {
+          id: row.get::<Uuid, _>("id"),
+          user_id: row.get::<Uuid, _>("user_id"),
+          status: row.get::<String, _>("status"),
+          total_cents: row.get::<i64, _>("total_cents"),
+          created_at: row.get::<DateTime<Utc>, _>("created_at"),
+          updated_at: row.get::<DateTime<Utc>, _>("updated_at"),
+        })
+        .collect(),
+    )
   }
 
   async fn get(&self, id: Uuid) -> Result<Order, RepoError> {
@@ -147,5 +149,3 @@ impl OrderRepository for PgOrderRepository {
     Ok(())
   }
 }
-
-

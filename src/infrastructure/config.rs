@@ -15,8 +15,10 @@ impl AppConfig {
       .parse::<u16>()
       .context("APP_PORT must be a u16")?;
     let database_url = std::env::var("DATABASE_URL").context("DATABASE_URL is required")?;
-    Ok(Self { host, port, database_url })
+    Ok(Self {
+      host,
+      port,
+      database_url,
+    })
   }
 }
-
-

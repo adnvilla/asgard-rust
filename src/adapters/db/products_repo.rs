@@ -69,17 +69,19 @@ impl ProductRepository for PgProductRepository {
     .await
     .map_err(map_sqlx_err)?;
 
-    Ok(rows
-      .into_iter()
-      .map(|row| Product {
-        id: row.get::<Uuid, _>("id"),
-        sku: row.get::<String, _>("sku"),
-        name: row.get::<String, _>("name"),
-        price_cents: row.get::<i64, _>("price_cents"),
-        created_at: row.get::<DateTime<Utc>, _>("created_at"),
-        updated_at: row.get::<DateTime<Utc>, _>("updated_at"),
-      })
-      .collect())
+    Ok(
+      rows
+        .into_iter()
+        .map(|row| Product {
+          id: row.get::<Uuid, _>("id"),
+          sku: row.get::<String, _>("sku"),
+          name: row.get::<String, _>("name"),
+          price_cents: row.get::<i64, _>("price_cents"),
+          created_at: row.get::<DateTime<Utc>, _>("created_at"),
+          updated_at: row.get::<DateTime<Utc>, _>("updated_at"),
+        })
+        .collect(),
+    )
   }
 
   async fn get(&self, id: Uuid) -> Result<Product, RepoError> {
@@ -148,5 +150,3 @@ impl ProductRepository for PgProductRepository {
     Ok(())
   }
 }
-
-

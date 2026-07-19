@@ -44,11 +44,18 @@ async fn setup() -> Option<(PgPool, AppState)> {
 
 #[tokio::test]
 async fn health_is_ok_with_db() {
-  let Some((_pool, state)) = setup().await else { return };
+  let Some((_pool, state)) = setup().await else {
+    return;
+  };
   let app = build_app(state);
 
   let res = app
-    .oneshot(Request::builder().uri("/health").body(Body::empty()).unwrap())
+    .oneshot(
+      Request::builder()
+        .uri("/health")
+        .body(Body::empty())
+        .unwrap(),
+    )
     .await
     .unwrap();
 
@@ -57,7 +64,9 @@ async fn health_is_ok_with_db() {
 
 #[tokio::test]
 async fn users_products_orders_crud_smoke() {
-  let Some((_pool, state)) = setup().await else { return };
+  let Some((_pool, state)) = setup().await else {
+    return;
+  };
   let app = build_app(state);
 
   // Create user
@@ -86,7 +95,9 @@ async fn users_products_orders_crud_smoke() {
         .method("POST")
         .uri("/products")
         .header("content-type", "application/json")
-        .body(Body::from(r#"{"sku":"sku-1","name":"Prod 1","price_cents":1234}"#))
+        .body(Body::from(
+          r#"{"sku":"sku-1","name":"Prod 1","price_cents":1234}"#,
+        ))
         .unwrap(),
     )
     .await
@@ -116,7 +127,12 @@ async fn users_products_orders_crud_smoke() {
   // Get order
   let res = app
     .clone()
-    .oneshot(Request::builder().uri(format!("/orders/{order_id}")).body(Body::empty()).unwrap())
+    .oneshot(
+      Request::builder()
+        .uri(format!("/orders/{order_id}"))
+        .body(Body::empty())
+        .unwrap(),
+    )
     .await
     .unwrap();
   assert_eq!(res.status(), StatusCode::OK);
@@ -150,5 +166,3 @@ async fn users_products_orders_crud_smoke() {
     .unwrap();
   assert_eq!(res.status(), StatusCode::NO_CONTENT);
 }
-
-
