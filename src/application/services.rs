@@ -13,7 +13,9 @@ pub struct UserService<R: UserRepository> {
 
 impl<R: UserRepository> UserService<R> {
   pub fn new(repo: R) -> Self {
-    Self { repo: Arc::new(repo) }
+    Self {
+      repo: Arc::new(repo),
+    }
   }
 
   pub async fn create(&self, input: NewUser) -> Result<User, RepoError> {
@@ -40,7 +42,9 @@ pub struct ProductService<R: ProductRepository> {
 
 impl<R: ProductRepository> ProductService<R> {
   pub fn new(repo: R) -> Self {
-    Self { repo: Arc::new(repo) }
+    Self {
+      repo: Arc::new(repo),
+    }
   }
 
   pub async fn create(&self, input: NewProduct) -> Result<Product, RepoError> {
@@ -67,7 +71,9 @@ pub struct OrderService<R: OrderRepository> {
 
 impl<R: OrderRepository> OrderService<R> {
   pub fn new(repo: R) -> Self {
-    Self { repo: Arc::new(repo) }
+    Self {
+      repo: Arc::new(repo),
+    }
   }
 
   pub async fn create(&self, input: NewOrder) -> Result<Order, RepoError> {
@@ -107,7 +113,13 @@ mod tests {
     async fn create(&self, input: NewUser) -> Result<User, RepoError> {
       let id = Uuid::new_v4();
       let now = Utc::now();
-      let user = User { id, email: input.email, name: input.name, created_at: now, updated_at: now };
+      let user = User {
+        id,
+        email: input.email,
+        name: input.name,
+        created_at: now,
+        updated_at: now,
+      };
       self.store.lock().await.insert(id, user.clone());
       Ok(user)
     }
@@ -115,7 +127,13 @@ mod tests {
       Ok(self.store.lock().await.values().cloned().collect())
     }
     async fn get(&self, id: Uuid) -> Result<User, RepoError> {
-      self.store.lock().await.get(&id).cloned().ok_or(RepoError::NotFound)
+      self
+        .store
+        .lock()
+        .await
+        .get(&id)
+        .cloned()
+        .ok_or(RepoError::NotFound)
     }
     async fn update(&self, id: Uuid, input: UpdateUser) -> Result<User, RepoError> {
       let mut guard = self.store.lock().await;
@@ -143,7 +161,10 @@ mod tests {
     let svc = UserService::new(FakeUserRepo::default());
 
     let created = svc
-      .create(NewUser { email: "a@b.com".into(), name: "Alice".into() })
+      .create(NewUser {
+        email: "a@b.com".into(),
+        name: "Alice".into(),
+      })
       .await
       .unwrap();
 
@@ -151,7 +172,13 @@ mod tests {
     assert_eq!(fetched.email, "a@b.com");
 
     let updated = svc
-      .update(created.id, UpdateUser { email: None, name: Some("Alicia".into()) })
+      .update(
+        created.id,
+        UpdateUser {
+          email: None,
+          name: Some("Alicia".into()),
+        },
+      )
       .await
       .unwrap();
     assert_eq!(updated.name, "Alicia");
@@ -161,5 +188,3 @@ mod tests {
     assert!(matches!(err, RepoError::NotFound));
   }
 }
-
-

@@ -33,8 +33,8 @@ async fn main() -> anyhow::Result<()> {
   let addr: SocketAddr = format!("{}:{}", config.host, config.port).parse()?;
 
   info!("listening on http://{addr}");
-  axum::Server::bind(&addr).serve(app.into_make_service()).await?;
+  axum::Server::bind(&addr)
+    .serve(app.into_make_service())
+    .await?;
   Ok(())
 }
-
-

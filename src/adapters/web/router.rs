@@ -2,7 +2,7 @@ use crate::adapters::web::error::ApiError;
 use crate::application::ports::{
   NewOrder, NewProduct, NewUser, UpdateOrder, UpdateProduct, UpdateUser,
 };
-use crate::{AppState};
+use crate::AppState;
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use axum::routing::{get, post};
@@ -34,7 +34,12 @@ pub fn router(state: AppState) -> Router {
       get(get_order).put(update_order).delete(delete_order),
     )
     .with_state(state)
-    .layer(CorsLayer::new().allow_origin(Any).allow_methods(Any).allow_headers(Any))
+    .layer(
+      CorsLayer::new()
+        .allow_origin(Any)
+        .allow_methods(Any)
+        .allow_headers(Any),
+    )
     .layer(
       TraceLayer::new_for_http()
         .make_span_with(|request: &axum::http::Request<_>| {
@@ -45,13 +50,17 @@ pub fn router(state: AppState) -> Router {
             uri = %request.uri(),
           )
         })
-        .on_response(|response: &axum::http::Response<_>, latency: std::time::Duration, _span: &tracing::Span| {
-          tracing::info!(
-            status = %response.status(),
-            latency_ms = latency.as_millis(),
-            "request completed"
-          )
-        })
+        .on_response(
+          |response: &axum::http::Response<_>,
+           latency: std::time::Duration,
+           _span: &tracing::Span| {
+            tracing::info!(
+              status = %response.status(),
+              latency_ms = latency.as_millis(),
+              "request completed"
+            )
+          },
+        ),
     )
 }
 
@@ -63,12 +72,19 @@ struct HealthResponse {
 
 async fn health(State(state): State<AppState>) -> Result<Json<HealthResponse>, ApiError> {
   let db_ok = db_health(state.pool.clone()).await;
-  Ok(Json(HealthResponse { status: "ok", db: if db_ok { "ok" } else { "error" } }))
+  Ok(Json(HealthResponse {
+    status: "ok",
+    db: if db_ok { "ok" } else { "error" },
+  }))
 }
 
 async fn db_health(pool: PgPool) -> bool {
   matches!(
-    tokio::time::timeout(Duration::from_secs(2), sqlx::query("SELECT 1").execute(&pool)).await,
+    tokio::time::timeout(
+      Duration::from_secs(2),
+      sqlx::query("SELECT 1").execute(&pool)
+    )
+    .await,
     Ok(Ok(_))
   )
 }
@@ -87,13 +103,18 @@ async fn create_user(
 ) -> Result<(StatusCode, Json<crate::domain::models::User>), ApiError> {
   let user = state
     .users
-    .create(NewUser { email: body.email, name: body.name })
+    .create(NewUser {
+      email: body.email,
+      name: body.name,
+    })
     .await
     .map_err(ApiError::from)?;
   Ok((StatusCode::CREATED, Json(user)))
 }
 
-async fn list_users(State(state): State<AppState>) -> Result<Json<Vec<crate::domain::models::User>>, ApiError> {
+async fn list_users(
+  State(state): State<AppState>,
+) -> Result<Json<Vec<crate::domain::models::User>>, ApiError> {
   let users = state.users.list().await.map_err(ApiError::from)?;
   Ok(Json(users))
 }
@@ -154,7 +175,11 @@ async fn create_product(
 ) -> Result<(StatusCode, Json<crate::domain::models::Product>), ApiError> {
   let product = state
     .products
-    .create(NewProduct { sku: body.sku, name: body.name, price_cents: body.price_cents })
+    .create(NewProduct {
+      sku: body.sku,
+      name: body.name,
+      price_cents: body.price_cents,
+    })
     .await
     .map_err(ApiError::from)?;
   Ok((StatusCode::CREATED, Json(product)))
@@ -191,7 +216,11 @@ async fn update_product(
     .products
     .update(
       id,
-      UpdateProduct { sku: body.sku, name: body.name, price_cents: body.price_cents },
+      UpdateProduct {
+        sku: body.sku,
+        name: body.name,
+        price_cents: body.price_cents,
+      },
     )
     .await
     .map_err(ApiError::from)?;
@@ -221,7 +250,11 @@ async fn create_order(
 ) -> Result<(StatusCode, Json<crate::domain::models::Order>), ApiError> {
   let order = state
     .orders
-    .create(NewOrder { user_id: body.user_id, status: body.status, total_cents: body.total_cents })
+    .create(NewOrder {
+      user_id: body.user_id,
+      status: body.status,
+      total_cents: body.total_cents,
+    })
     .await
     .map_err(ApiError::from)?;
   Ok((StatusCode::CREATED, Json(order)))
@@ -255,7 +288,13 @@ async fn update_order(
 ) -> Result<Json<crate::domain::models::Order>, ApiError> {
   let order = state
     .orders
-    .update(id, UpdateOrder { status: body.status, total_cents: body.total_cents })
+    .update(
+      id,
+      UpdateOrder {
+        status: body.status,
+        total_cents: body.total_cents,
+      },
+    )
     .await
     .map_err(ApiError::from)?;
   Ok(Json(order))
@@ -268,5 +307,3 @@ async fn delete_order(
   state.orders.delete(id).await.map_err(ApiError::from)?;
   Ok(StatusCode::NO_CONTENT)
 }
-
-

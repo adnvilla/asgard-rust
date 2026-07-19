@@ -34,7 +34,7 @@ async fn setup_app() -> Option<(AppState, axum::Router)> {
     eprintln!("ERROR: Failed to run migrations: {}", e);
     return None;
   }
-  
+
   // Limpiar datos antes de los benchmarks
   if let Err(e) = sqlx::query("TRUNCATE orders, products, users CASCADE")
     .execute(&pool)
@@ -128,7 +128,7 @@ fn setup_app_or_skip(rt: &tokio::runtime::Runtime) -> Option<(AppState, axum::Ro
 
 fn bench_health_check(c: &mut Criterion) {
   let rt = tokio::runtime::Runtime::new().unwrap();
-  
+
   let (_, app) = match setup_app_or_skip(&rt) {
     Some(app) => app,
     None => return,
@@ -151,7 +151,7 @@ fn bench_health_check(c: &mut Criterion) {
 
 fn bench_get_users(c: &mut Criterion) {
   let rt = tokio::runtime::Runtime::new().unwrap();
-  
+
   let (_, app) = match setup_app_or_skip(&rt) {
     Some(app) => app,
     None => return,
@@ -174,7 +174,7 @@ fn bench_get_users(c: &mut Criterion) {
 
 fn bench_get_products(c: &mut Criterion) {
   let rt = tokio::runtime::Runtime::new().unwrap();
-  
+
   let (_, app) = match setup_app_or_skip(&rt) {
     Some(app) => app,
     None => return,
@@ -197,7 +197,7 @@ fn bench_get_products(c: &mut Criterion) {
 
 fn bench_get_orders(c: &mut Criterion) {
   let rt = tokio::runtime::Runtime::new().unwrap();
-  
+
   let (_, app) = match setup_app_or_skip(&rt) {
     Some(app) => app,
     None => return,
@@ -220,12 +220,12 @@ fn bench_get_orders(c: &mut Criterion) {
 
 fn bench_get_user_by_id(c: &mut Criterion) {
   let rt = tokio::runtime::Runtime::new().unwrap();
-  
+
   let (state, app) = match setup_app_or_skip(&rt) {
     Some(app) => app,
     None => return,
   };
-  
+
   // Obtener un ID de usuario existente
   let user_id: Uuid = rt.block_on(async {
     sqlx::query_scalar::<_, Uuid>("SELECT id FROM users LIMIT 1")
@@ -235,11 +235,8 @@ fn bench_get_user_by_id(c: &mut Criterion) {
   });
 
   c.bench_function("get_user_by_id", |b| {
-    let app = app.clone();
-    let user_id = user_id;
     b.to_async(&rt).iter(|| {
       let app = app.clone();
-      let user_id = user_id;
       async move {
         let req = Request::builder()
           .uri(format!("/users/{}", user_id))
@@ -254,7 +251,7 @@ fn bench_get_user_by_id(c: &mut Criterion) {
 
 fn bench_create_user(c: &mut Criterion) {
   let rt = tokio::runtime::Runtime::new().unwrap();
-  
+
   let (_, app) = match setup_app_or_skip(&rt) {
     Some(app) => app,
     None => return,
@@ -288,7 +285,7 @@ fn bench_create_user(c: &mut Criterion) {
 
 fn bench_create_product(c: &mut Criterion) {
   let rt = tokio::runtime::Runtime::new().unwrap();
-  
+
   let (_, app) = match setup_app_or_skip(&rt) {
     Some(app) => app,
     None => return,
@@ -305,7 +302,10 @@ fn bench_create_product(c: &mut Criterion) {
         let uuid = Uuid::new_v4();
         let body = format!(
           r#"{{"sku":"BENCH-{}-{}","name":"Bench Product {}","price_cents":{}}}"#,
-          val, uuid, val, val * 1000
+          val,
+          uuid,
+          val,
+          val * 1000
         );
         let req = Request::builder()
           .method("POST")
@@ -322,12 +322,12 @@ fn bench_create_product(c: &mut Criterion) {
 
 fn bench_create_order(c: &mut Criterion) {
   let rt = tokio::runtime::Runtime::new().unwrap();
-  
+
   let (state, app) = match setup_app_or_skip(&rt) {
     Some(app) => app,
     None => return,
   };
-  
+
   // Obtener un ID de usuario existente
   let user_id: Uuid = rt.block_on(async {
     sqlx::query_scalar::<_, Uuid>("SELECT id FROM users LIMIT 1")
@@ -337,18 +337,16 @@ fn bench_create_order(c: &mut Criterion) {
   });
 
   c.bench_function("create_order", |b| {
-    let app = app.clone();
-    let user_id = user_id;
     let counter = Arc::new(AtomicU64::new(0));
     b.to_async(&rt).iter(|| {
       let app = app.clone();
-      let user_id = user_id;
       let counter = counter.clone();
       async move {
         let val = counter.fetch_add(1, Ordering::Relaxed);
         let body = format!(
           r#"{{"user_id":"{}","status":"created","total_cents":{}}}"#,
-          user_id, val * 1000
+          user_id,
+          val * 1000
         );
         let req = Request::builder()
           .method("POST")
@@ -365,12 +363,12 @@ fn bench_create_order(c: &mut Criterion) {
 
 fn bench_update_user(c: &mut Criterion) {
   let rt = tokio::runtime::Runtime::new().unwrap();
-  
+
   let (state, app) = match setup_app_or_skip(&rt) {
     Some(app) => app,
     None => return,
   };
-  
+
   // Obtener un ID de usuario existente
   let user_id: Uuid = rt.block_on(async {
     sqlx::query_scalar::<_, Uuid>("SELECT id FROM users LIMIT 1")
@@ -380,11 +378,8 @@ fn bench_update_user(c: &mut Criterion) {
   });
 
   c.bench_function("update_user", |b| {
-    let app = app.clone();
-    let user_id = user_id;
     b.to_async(&rt).iter(|| {
       let app = app.clone();
-      let user_id = user_id;
       async move {
         let body = r#"{"name":"Updated Name"}"#;
         let req = Request::builder()
@@ -402,7 +397,7 @@ fn bench_update_user(c: &mut Criterion) {
 
 fn bench_delete_order(c: &mut Criterion) {
   let rt = tokio::runtime::Runtime::new().unwrap();
-  
+
   let (state, app) = match setup_app_or_skip(&rt) {
     Some(app) => app,
     None => return,
@@ -419,10 +414,10 @@ fn bench_delete_order(c: &mut Criterion) {
           .fetch_one(&pool)
           .await
           .unwrap();
-        
+
         sqlx::query(
           "INSERT INTO orders (id, user_id, status, total_cents, created_at, updated_at) 
-           VALUES ($1, $2, $3, $4, NOW(), NOW())"
+           VALUES ($1, $2, $3, $4, NOW(), NOW())",
         )
         .bind(order_id)
         .bind(user_id)

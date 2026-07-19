@@ -78,5 +78,3 @@ pub trait OrderRepository: Send + Sync + 'static {
   async fn update(&self, id: Uuid, input: UpdateOrder) -> Result<Order, RepoError>;
   async fn delete(&self, id: Uuid) -> Result<(), RepoError>;
 }
-
-

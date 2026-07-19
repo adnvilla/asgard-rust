@@ -36,7 +36,7 @@ La API queda en `http://127.0.0.1:8080` (`GET /health`).
 
 ### Configuración
 
-Copia `env.example` a `.env` y ajusta valores:
+Copia `.env.example` a `.env` y ajusta valores:
 
 - `DATABASE_URL` (requerido)
 - `APP_HOST` (default `127.0.0.1`)
