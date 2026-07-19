@@ -21,10 +21,9 @@ fn map_sqlx_err(err: sqlx::Error) -> RepoError {
     sqlx::Error::RowNotFound => RepoError::NotFound,
     sqlx::Error::Database(db_err) => {
       // foreign_key_violation = 23503, unique_violation = 23505
-      if db_err.code().as_deref() == Some("23505") {
-        RepoError::Conflict
-      } else {
-        RepoError::Unexpected(err.to_string())
+      match db_err.code().as_deref() {
+        Some("23503") | Some("23505") => RepoError::Conflict,
+        _ => RepoError::Unexpected(err.to_string()),
       }
     }
     _ => RepoError::Unexpected(err.to_string()),
