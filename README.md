@@ -26,7 +26,7 @@ docker compose up -d db
 
 ### Configuración
 
-Copia `env.example` a `.env` y ajusta valores:
+Copia `.env.example` a `.env` y ajusta valores:
 
 - `DATABASE_URL` (requerido)
 - `APP_HOST` (default `127.0.0.1`)
