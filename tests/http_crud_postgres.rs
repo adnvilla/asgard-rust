@@ -151,4 +151,29 @@ async fn users_products_orders_crud_smoke() {
   assert_eq!(res.status(), StatusCode::NO_CONTENT);
 }
 
+#[tokio::test]
+async fn create_order_with_unknown_user_returns_conflict() {
+  let Some((_pool, state)) = setup().await else {
+    return;
+  };
+  let app = build_app(state);
+  let missing_user = Uuid::new_v4();
+
+  let res = app
+    .oneshot(
+      Request::builder()
+        .method("POST")
+        .uri("/orders")
+        .header("content-type", "application/json")
+        .body(Body::from(format!(
+          r#"{{"user_id":"{missing_user}","status":"created","total_cents":100}}"#
+        )))
+        .unwrap(),
+    )
+    .await
+    .unwrap();
+
+  assert_eq!(res.status(), StatusCode::CONFLICT);
+}
+
 
