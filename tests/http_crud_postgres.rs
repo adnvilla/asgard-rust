@@ -7,14 +7,15 @@ use axum::http::{Request, StatusCode};
 use hyper::body::to_bytes;
 use serde_json::Value;
 use sqlx::PgPool;
-use std::sync::{Arc, Mutex, MutexGuard};
+use std::sync::Arc;
+use tokio::sync::{Mutex, MutexGuard};
 use tower::ServiceExt;
 use uuid::Uuid;
 
-static DB_LOCK: Mutex<()> = Mutex::new(());
+static DB_LOCK: Mutex<()> = Mutex::const_new(());
 
 async fn setup() -> Option<(PgPool, AppState, MutexGuard<'static, ()>)> {
-  let guard = DB_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+  let guard = DB_LOCK.lock().await;
 
   let database_url = match std::env::var("DATABASE_URL") {
     Ok(v) => v,
@@ -54,13 +55,7 @@ async fn setup() -> Option<(PgPool, AppState, MutexGuard<'static, ()>)> {
 
 fn json_id(body: &[u8]) -> Uuid {
   let value: Value = serde_json::from_slice(body).unwrap();
-  value
-    .get("id")
-    .unwrap()
-    .as_str()
-    .unwrap()
-    .parse()
-    .unwrap()
+  value.get("id").unwrap().as_str().unwrap().parse().unwrap()
 }
 
 #[tokio::test]
@@ -121,7 +116,12 @@ async fn users_crud_and_conflict() {
 
   let res = app
     .clone()
-    .oneshot(Request::builder().uri("/users").body(Body::empty()).unwrap())
+    .oneshot(
+      Request::builder()
+        .uri("/users")
+        .body(Body::empty())
+        .unwrap(),
+    )
     .await
     .unwrap();
   assert_eq!(res.status(), StatusCode::OK);
@@ -280,7 +280,9 @@ async fn products_crud_and_conflict() {
         .method("PUT")
         .uri(format!("/products/{product_id}"))
         .header("content-type", "application/json")
-        .body(Body::from(r#"{"name":"Prod 1 Updated","price_cents":2000}"#))
+        .body(Body::from(
+          r#"{"name":"Prod 1 Updated","price_cents":2000}"#,
+        ))
         .unwrap(),
     )
     .await
@@ -354,7 +356,9 @@ async fn orders_crud_and_not_found() {
         .method("POST")
         .uri("/users")
         .header("content-type", "application/json")
-        .body(Body::from(r#"{"email":"buyer@example.com","name":"Buyer"}"#))
+        .body(Body::from(
+          r#"{"email":"buyer@example.com","name":"Buyer"}"#,
+        ))
         .unwrap(),
     )
     .await
@@ -381,7 +385,12 @@ async fn orders_crud_and_not_found() {
 
   let res = app
     .clone()
-    .oneshot(Request::builder().uri("/orders").body(Body::empty()).unwrap())
+    .oneshot(
+      Request::builder()
+        .uri("/orders")
+        .body(Body::empty())
+        .unwrap(),
+    )
     .await
     .unwrap();
   assert_eq!(res.status(), StatusCode::OK);
