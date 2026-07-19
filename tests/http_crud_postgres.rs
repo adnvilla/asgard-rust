@@ -5,6 +5,7 @@ use asgard_rust::{build_app, AppState};
 use axum::body::Body;
 use axum::http::{Request, StatusCode};
 use hyper::body::to_bytes;
+use serde_json::Value;
 use sqlx::PgPool;
 use std::sync::Arc;
 use tower::ServiceExt;
@@ -13,7 +14,12 @@ use uuid::Uuid;
 async fn setup() -> Option<(PgPool, AppState)> {
   let database_url = match std::env::var("DATABASE_URL") {
     Ok(v) => v,
-    Err(_) => return None,
+    Err(_) => {
+      if std::env::var("CI").is_ok() {
+        panic!("DATABASE_URL must be set in CI");
+      }
+      return None;
+    }
   };
 
   let pool = infra_db::create_pool(&database_url).await.ok()?;
@@ -42,13 +48,31 @@ async fn setup() -> Option<(PgPool, AppState)> {
   Some((pool, state))
 }
 
+fn json_id(body: &[u8]) -> Uuid {
+  let value: Value = serde_json::from_slice(body).unwrap();
+  value
+    .get("id")
+    .unwrap()
+    .as_str()
+    .unwrap()
+    .parse()
+    .unwrap()
+}
+
 #[tokio::test]
 async fn health_is_ok_with_db() {
-  let Some((_pool, state)) = setup().await else { return };
+  let Some((_pool, state)) = setup().await else {
+    return;
+  };
   let app = build_app(state);
 
   let res = app
-    .oneshot(Request::builder().uri("/health").body(Body::empty()).unwrap())
+    .oneshot(
+      Request::builder()
+        .uri("/health")
+        .body(Body::empty())
+        .unwrap(),
+    )
     .await
     .unwrap();
 
@@ -56,11 +80,12 @@ async fn health_is_ok_with_db() {
 }
 
 #[tokio::test]
-async fn users_products_orders_crud_smoke() {
-  let Some((_pool, state)) = setup().await else { return };
+async fn users_crud_and_conflict() {
+  let Some((_pool, state)) = setup().await else {
+    return;
+  };
   let app = build_app(state);
 
-  // Create user
   let res = app
     .clone()
     .oneshot(
@@ -74,11 +99,117 @@ async fn users_products_orders_crud_smoke() {
     .await
     .unwrap();
   assert_eq!(res.status(), StatusCode::CREATED);
-  let body = to_bytes(res.into_body()).await.unwrap();
-  let user: serde_json::Value = serde_json::from_slice(&body).unwrap();
-  let user_id: Uuid = user.get("id").unwrap().as_str().unwrap().parse().unwrap();
+  let user_id = json_id(&to_bytes(res.into_body()).await.unwrap());
 
-  // Create product
+  let res = app
+    .clone()
+    .oneshot(
+      Request::builder()
+        .method("POST")
+        .uri("/users")
+        .header("content-type", "application/json")
+        .body(Body::from(r#"{"email":"u1@example.com","name":"Dup"}"#))
+        .unwrap(),
+    )
+    .await
+    .unwrap();
+  assert_eq!(res.status(), StatusCode::CONFLICT);
+
+  let res = app
+    .clone()
+    .oneshot(Request::builder().uri("/users").body(Body::empty()).unwrap())
+    .await
+    .unwrap();
+  assert_eq!(res.status(), StatusCode::OK);
+  let list: Vec<Value> = serde_json::from_slice(&to_bytes(res.into_body()).await.unwrap()).unwrap();
+  assert_eq!(list.len(), 1);
+
+  let res = app
+    .clone()
+    .oneshot(
+      Request::builder()
+        .uri(format!("/users/{user_id}"))
+        .body(Body::empty())
+        .unwrap(),
+    )
+    .await
+    .unwrap();
+  assert_eq!(res.status(), StatusCode::OK);
+
+  let res = app
+    .clone()
+    .oneshot(
+      Request::builder()
+        .method("PUT")
+        .uri(format!("/users/{user_id}"))
+        .header("content-type", "application/json")
+        .body(Body::from(r#"{"name":"User 1 Updated"}"#))
+        .unwrap(),
+    )
+    .await
+    .unwrap();
+  assert_eq!(res.status(), StatusCode::OK);
+
+  let res = app
+    .clone()
+    .oneshot(
+      Request::builder()
+        .method("DELETE")
+        .uri(format!("/users/{user_id}"))
+        .body(Body::empty())
+        .unwrap(),
+    )
+    .await
+    .unwrap();
+  assert_eq!(res.status(), StatusCode::NO_CONTENT);
+
+  let missing = Uuid::new_v4();
+  let res = app
+    .clone()
+    .oneshot(
+      Request::builder()
+        .uri(format!("/users/{missing}"))
+        .body(Body::empty())
+        .unwrap(),
+    )
+    .await
+    .unwrap();
+  assert_eq!(res.status(), StatusCode::NOT_FOUND);
+
+  let res = app
+    .clone()
+    .oneshot(
+      Request::builder()
+        .method("PUT")
+        .uri(format!("/users/{missing}"))
+        .header("content-type", "application/json")
+        .body(Body::from(r#"{"name":"Nope"}"#))
+        .unwrap(),
+    )
+    .await
+    .unwrap();
+  assert_eq!(res.status(), StatusCode::NOT_FOUND);
+
+  let res = app
+    .oneshot(
+      Request::builder()
+        .method("DELETE")
+        .uri(format!("/users/{missing}"))
+        .body(Body::empty())
+        .unwrap(),
+    )
+    .await
+    .unwrap();
+  assert_eq!(res.status(), StatusCode::NOT_FOUND);
+}
+
+#[tokio::test]
+async fn products_crud_and_conflict() {
+  let Some((_pool, state)) = setup().await else {
+    return;
+  };
+  let app = build_app(state);
+
   let res = app
     .clone()
     .oneshot(
@@ -86,14 +217,147 @@ async fn users_products_orders_crud_smoke() {
         .method("POST")
         .uri("/products")
         .header("content-type", "application/json")
-        .body(Body::from(r#"{"sku":"sku-1","name":"Prod 1","price_cents":1234}"#))
+        .body(Body::from(
+          r#"{"sku":"sku-1","name":"Prod 1","price_cents":1234}"#,
+        ))
         .unwrap(),
     )
     .await
     .unwrap();
   assert_eq!(res.status(), StatusCode::CREATED);
+  let product_id = json_id(&to_bytes(res.into_body()).await.unwrap());
 
-  // Create order (depends on user)
+  let res = app
+    .clone()
+    .oneshot(
+      Request::builder()
+        .method("POST")
+        .uri("/products")
+        .header("content-type", "application/json")
+        .body(Body::from(
+          r#"{"sku":"sku-1","name":"Dup","price_cents":1}"#,
+        ))
+        .unwrap(),
+    )
+    .await
+    .unwrap();
+  assert_eq!(res.status(), StatusCode::CONFLICT);
+
+  let res = app
+    .clone()
+    .oneshot(
+      Request::builder()
+        .uri("/products")
+        .body(Body::empty())
+        .unwrap(),
+    )
+    .await
+    .unwrap();
+  assert_eq!(res.status(), StatusCode::OK);
+  let list: Vec<Value> = serde_json::from_slice(&to_bytes(res.into_body()).await.unwrap()).unwrap();
+  assert_eq!(list.len(), 1);
+
+  let res = app
+    .clone()
+    .oneshot(
+      Request::builder()
+        .uri(format!("/products/{product_id}"))
+        .body(Body::empty())
+        .unwrap(),
+    )
+    .await
+    .unwrap();
+  assert_eq!(res.status(), StatusCode::OK);
+
+  let res = app
+    .clone()
+    .oneshot(
+      Request::builder()
+        .method("PUT")
+        .uri(format!("/products/{product_id}"))
+        .header("content-type", "application/json")
+        .body(Body::from(r#"{"name":"Prod 1 Updated","price_cents":2000}"#))
+        .unwrap(),
+    )
+    .await
+    .unwrap();
+  assert_eq!(res.status(), StatusCode::OK);
+
+  let res = app
+    .clone()
+    .oneshot(
+      Request::builder()
+        .method("DELETE")
+        .uri(format!("/products/{product_id}"))
+        .body(Body::empty())
+        .unwrap(),
+    )
+    .await
+    .unwrap();
+  assert_eq!(res.status(), StatusCode::NO_CONTENT);
+
+  let missing = Uuid::new_v4();
+  let res = app
+    .clone()
+    .oneshot(
+      Request::builder()
+        .uri(format!("/products/{missing}"))
+        .body(Body::empty())
+        .unwrap(),
+    )
+    .await
+    .unwrap();
+  assert_eq!(res.status(), StatusCode::NOT_FOUND);
+
+  let res = app
+    .clone()
+    .oneshot(
+      Request::builder()
+        .method("PUT")
+        .uri(format!("/products/{missing}"))
+        .header("content-type", "application/json")
+        .body(Body::from(r#"{"name":"Nope"}"#))
+        .unwrap(),
+    )
+    .await
+    .unwrap();
+  assert_eq!(res.status(), StatusCode::NOT_FOUND);
+
+  let res = app
+    .oneshot(
+      Request::builder()
+        .method("DELETE")
+        .uri(format!("/products/{missing}"))
+        .body(Body::empty())
+        .unwrap(),
+    )
+    .await
+    .unwrap();
+  assert_eq!(res.status(), StatusCode::NOT_FOUND);
+}
+
+#[tokio::test]
+async fn orders_crud_and_not_found() {
+  let Some((_pool, state)) = setup().await else {
+    return;
+  };
+  let app = build_app(state);
+
+  let res = app
+    .clone()
+    .oneshot(
+      Request::builder()
+        .method("POST")
+        .uri("/users")
+        .header("content-type", "application/json")
+        .body(Body::from(r#"{"email":"buyer@example.com","name":"Buyer"}"#))
+        .unwrap(),
+    )
+    .await
+    .unwrap();
+  assert_eq!(res.status(), StatusCode::CREATED);
+  let user_id = json_id(&to_bytes(res.into_body()).await.unwrap());
+
   let res = app
     .clone()
     .oneshot(
@@ -109,19 +373,29 @@ async fn users_products_orders_crud_smoke() {
     .await
     .unwrap();
   assert_eq!(res.status(), StatusCode::CREATED);
-  let body = to_bytes(res.into_body()).await.unwrap();
-  let order: serde_json::Value = serde_json::from_slice(&body).unwrap();
-  let order_id: Uuid = order.get("id").unwrap().as_str().unwrap().parse().unwrap();
+  let order_id = json_id(&to_bytes(res.into_body()).await.unwrap());
 
-  // Get order
   let res = app
     .clone()
-    .oneshot(Request::builder().uri(format!("/orders/{order_id}")).body(Body::empty()).unwrap())
+    .oneshot(Request::builder().uri("/orders").body(Body::empty()).unwrap())
+    .await
+    .unwrap();
+  assert_eq!(res.status(), StatusCode::OK);
+  let list: Vec<Value> = serde_json::from_slice(&to_bytes(res.into_body()).await.unwrap()).unwrap();
+  assert_eq!(list.len(), 1);
+
+  let res = app
+    .clone()
+    .oneshot(
+      Request::builder()
+        .uri(format!("/orders/{order_id}"))
+        .body(Body::empty())
+        .unwrap(),
+    )
     .await
     .unwrap();
   assert_eq!(res.status(), StatusCode::OK);
 
-  // Update order
   let res = app
     .clone()
     .oneshot(
@@ -136,7 +410,6 @@ async fn users_products_orders_crud_smoke() {
     .unwrap();
   assert_eq!(res.status(), StatusCode::OK);
 
-  // Delete order
   let res = app
     .clone()
     .oneshot(
@@ -149,6 +422,43 @@ async fn users_products_orders_crud_smoke() {
     .await
     .unwrap();
   assert_eq!(res.status(), StatusCode::NO_CONTENT);
+
+  let missing = Uuid::new_v4();
+  let res = app
+    .clone()
+    .oneshot(
+      Request::builder()
+        .uri(format!("/orders/{missing}"))
+        .body(Body::empty())
+        .unwrap(),
+    )
+    .await
+    .unwrap();
+  assert_eq!(res.status(), StatusCode::NOT_FOUND);
+
+  let res = app
+    .clone()
+    .oneshot(
+      Request::builder()
+        .method("PUT")
+        .uri(format!("/orders/{missing}"))
+        .header("content-type", "application/json")
+        .body(Body::from(r#"{"status":"cancelled"}"#))
+        .unwrap(),
+    )
+    .await
+    .unwrap();
+  assert_eq!(res.status(), StatusCode::NOT_FOUND);
+
+  let res = app
+    .oneshot(
+      Request::builder()
+        .method("DELETE")
+        .uri(format!("/orders/{missing}"))
+        .body(Body::empty())
+        .unwrap(),
+    )
+    .await
+    .unwrap();
+  assert_eq!(res.status(), StatusCode::NOT_FOUND);
 }
-
-
