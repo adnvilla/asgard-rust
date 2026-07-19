@@ -1,0 +1,9 @@
+target
+.git
+.github
+img
+.env
+.env.*
+*.log
+benches/target
+**/criterion

@@ -22,7 +22,17 @@ REST API en **Rust** con **Axum + SQLx + PostgreSQL**, siguiendo **Clean Archite
 
 ```bash
 docker compose up -d db
+# o: make db-up
 ```
+
+### Levantar API + PostgreSQL (Docker)
+
+```bash
+docker compose up -d --build
+# o: make up
+```
+
+La API queda en `http://127.0.0.1:8080` (`GET /health`).
 
 ### Configuración
 

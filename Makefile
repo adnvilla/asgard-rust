@@ -1,4 +1,4 @@
-.PHONY: help db-up db-down db-logs run test bench fmt clippy check lint
+.PHONY: help db-up db-down db-logs up down run test bench fmt clippy check lint
 
 COMPOSE ?= docker compose -f compose.yaml
 
@@ -12,6 +12,8 @@ help:
 	@echo "  make db-up     # Start PostgreSQL (Docker)"
 	@echo "  make db-down   # Stop PostgreSQL (Docker)"
 	@echo "  make db-logs   # Follow PostgreSQL logs"
+	@echo "  make up        # Build and start API + PostgreSQL"
+	@echo "  make down      # Stop API + PostgreSQL"
 	@echo "  make run       # Run the API"
 	@echo "  make test      # Run tests"
 	@echo "  make bench     # Run benchmarks"
@@ -28,6 +30,12 @@ db-down:
 
 db-logs:
 	$(COMPOSE) logs -f db
+
+up:
+	$(COMPOSE) up -d --build
+
+down:
+	$(COMPOSE) down
 
 run:
 	$(WITH_ENV) cargo run
