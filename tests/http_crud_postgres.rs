@@ -7,11 +7,15 @@ use axum::http::{Request, StatusCode};
 use hyper::body::to_bytes;
 use serde_json::Value;
 use sqlx::PgPool;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex, MutexGuard};
 use tower::ServiceExt;
 use uuid::Uuid;
 
-async fn setup() -> Option<(PgPool, AppState)> {
+static DB_LOCK: Mutex<()> = Mutex::new(());
+
+async fn setup() -> Option<(PgPool, AppState, MutexGuard<'static, ()>)> {
+  let guard = DB_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+
   let database_url = match std::env::var("DATABASE_URL") {
     Ok(v) => v,
     Err(_) => {
@@ -45,7 +49,7 @@ async fn setup() -> Option<(PgPool, AppState)> {
     },
   };
 
-  Some((pool, state))
+  Some((pool, state, guard))
 }
 
 fn json_id(body: &[u8]) -> Uuid {
@@ -61,7 +65,7 @@ fn json_id(body: &[u8]) -> Uuid {
 
 #[tokio::test]
 async fn health_is_ok_with_db() {
-  let Some((_pool, state)) = setup().await else {
+  let Some((_pool, state, _guard)) = setup().await else {
     return;
   };
   let app = build_app(state);
@@ -81,7 +85,7 @@ async fn health_is_ok_with_db() {
 
 #[tokio::test]
 async fn users_crud_and_conflict() {
-  let Some((_pool, state)) = setup().await else {
+  let Some((_pool, state, _guard)) = setup().await else {
     return;
   };
   let app = build_app(state);
@@ -205,7 +209,7 @@ async fn users_crud_and_conflict() {
 
 #[tokio::test]
 async fn products_crud_and_conflict() {
-  let Some((_pool, state)) = setup().await else {
+  let Some((_pool, state, _guard)) = setup().await else {
     return;
   };
   let app = build_app(state);
@@ -338,7 +342,7 @@ async fn products_crud_and_conflict() {
 
 #[tokio::test]
 async fn orders_crud_and_not_found() {
-  let Some((_pool, state)) = setup().await else {
+  let Some((_pool, state, _guard)) = setup().await else {
     return;
   };
   let app = build_app(state);
